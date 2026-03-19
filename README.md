@@ -54,13 +54,37 @@
 
 ```mermaid
 flowchart LR
-  A["GitHub PR / Compare 页面"] --> B["扩展弹窗"]
-  B --> C["解析当前 URL"]
-  C --> D["拼接对应 .diff 地址"]
-  D --> E["抓取 Diff 内容"]
-  E --> F["请求 AI API 生成摘要"]
-  F --> G["在弹窗中展示结果"]
-  G --> H["注入 GitHub PR 描述输入框"]
+  classDef github fill:#f6f8fa,stroke:#24292f,stroke-width:1.2px,color:#24292f;
+  classDef ext fill:#fff7ed,stroke:#ea580c,stroke-width:1.2px,color:#9a3412;
+  classDef ai fill:#ecfeff,stroke:#0891b2,stroke-width:1.2px,color:#164e63;
+  classDef result fill:#f0fdf4,stroke:#16a34a,stroke-width:1.2px,color:#14532d;
+
+  subgraph GH["GitHub"]
+    A["PR / Compare 页面"]
+    H["PR 描述输入框"]
+  end
+
+  subgraph EXT["浏览器扩展"]
+    B["读取当前标签页 URL"]
+    C["拼接对应的 .diff 地址"]
+    D["抓取 Diff 并截断长文本"]
+    E["组合提示词与 Diff"]
+    F["弹窗展示生成结果"]
+    G["用户确认后点击“一键粘贴”"]
+    I["注入内容并触发页面表单事件"]
+  end
+
+  subgraph API["AI 服务"]
+    J["Chat Completions API"]
+    K["返回 Markdown PR 描述"]
+  end
+
+  A --> B --> C --> D --> E --> J --> K --> F --> G --> I --> H
+
+  class A,H github;
+  class B,C,D,E,F,G,I ext;
+  class J ai;
+  class K result;
 ```
 
 核心逻辑目前集中在 [`popup.tsx`](/Users/cc/my-github-ai-helper/popup.tsx)：
