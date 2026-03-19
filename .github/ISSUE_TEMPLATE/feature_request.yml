@@ -1,0 +1,54 @@
+name: Feature Request
+description: Suggest an improvement or new capability for AI PR Helper
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sharing an idea.
+
+        Helpful feature requests explain the problem first, then the proposed solution.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem To Solve
+      description: What friction or limitation are you running into today?
+      placeholder: The generated PR description is too short for larger changes
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: Describe the behavior or UX you would like to see
+      placeholder: Add configurable sections like testing notes, risks, and rollback plan
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Optional
+      placeholder: I currently edit the generated text manually every time
+  - type: dropdown
+    id: area
+    attributes:
+      label: Related Area
+      options:
+        - Prompt generation
+        - GitHub page compatibility
+        - Extension UI
+        - Settings / configuration
+        - Performance
+        - Security
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional Context
+      placeholder: Mockups, examples, references, or related tools

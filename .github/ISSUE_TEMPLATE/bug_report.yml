@@ -1,0 +1,69 @@
+name: Bug Report
+description: Report a bug or regression in AI PR Helper
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve AI PR Helper.
+
+        Please provide enough detail for us to reproduce the issue.
+  - type: input
+    id: summary
+    attributes:
+      label: Problem Summary
+      description: A short sentence describing the bug
+      placeholder: Clicking "Generate PR Description" returns an error on GitHub PR pages
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps To Reproduce
+      description: List the exact steps needed to reproduce the issue
+      placeholder: |
+        1. Open a GitHub PR page
+        2. Click the extension icon
+        3. Click "Generate PR Description"
+        4. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      placeholder: A PR summary should be generated in the popup
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      placeholder: The popup shows "Failed to fetch diff"
+    validations:
+      required: true
+  - type: dropdown
+    id: page_type
+    attributes:
+      label: GitHub Page Type
+      options:
+        - Pull Request page
+        - Compare page
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      placeholder: Chrome 134 / Edge 134
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional Context
+      description: Screenshots, logs, repo visibility, or anything else that might help
+      placeholder: Paste any extra details here
