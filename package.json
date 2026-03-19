@@ -2,7 +2,7 @@
   "name": "my-github-ai-helper",
   "displayName": "My github ai helper",
   "version": "0.0.1",
-  "description": "A browser extension that generates GitHub PR descriptions from diffs using Kimi.",
+  "description": "A browser extension that generates GitHub PR descriptions from diffs using configurable AI APIs.",
   "author": "JackCC <chencan0703@gmail.com>",
   "scripts": {
     "dev": "plasmo dev",
@@ -31,7 +31,9 @@
     ],
     "host_permissions": [
       "https://github.com/*",
-      "https://patch-diff.githubusercontent.com/*"
+      "https://patch-diff.githubusercontent.com/*",
+      "https://*/*",
+      "http://*/*"
     ]
   }
 }

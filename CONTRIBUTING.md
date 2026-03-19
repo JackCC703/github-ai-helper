@@ -20,7 +20,7 @@
 - Node.js 18+
 - npm
 - Chromium 浏览器
-- 可用的 Kimi API Key
+- 可用的 AI API Key
 
 ### 安装依赖
 
@@ -37,8 +37,12 @@ cp .env.example .env
 填写：
 
 ```bash
-PLASMO_PUBLIC_KIMI_API_KEY=your_kimi_api_key_here
+PLASMO_PUBLIC_AI_API_KEY=your_api_key_here
+PLASMO_PUBLIC_AI_BASE_URL=https://api.moonshot.cn/v1
+PLASMO_PUBLIC_AI_MODEL=moonshot-v1-8k
 ```
+
+默认值仍然兼容 Kimi；如果你接的是其他兼容 OpenAI Chat Completions 的服务，把地址和模型名替换掉即可。
 
 ### 启动开发
 

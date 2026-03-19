@@ -2,7 +2,7 @@
 
 一个面向 GitHub Pull Request 场景的浏览器扩展。
 
-它会读取当前 PR 或 Compare 页面的 Git Diff，调用 Kimi 生成结构化 PR 描述，并支持一键回填到 GitHub 的描述输入框里。整个流程都发生在浏览器侧，适合个人开发者和小团队先快速验证想法、提升提 PR 的效率。
+它会读取当前 PR 或 Compare 页面的 Git Diff，调用兼容 OpenAI Chat Completions 协议的 AI 接口生成结构化 PR 描述，并支持一键回填到 GitHub 的描述输入框里。整个流程都发生在浏览器侧，适合个人开发者和小团队先快速验证想法、提升提 PR 的效率。
 
 ## 项目定位
 
@@ -19,7 +19,7 @@
 
 - 自动识别 GitHub PR 页面和 Compare 页面
 - 自动推导并抓取当前页面对应的 `.diff`
-- 将 Diff 发给 Kimi 生成 PR 描述
+- 将 Diff 发给可配置的 AI 接口生成 PR 描述
 - 在弹窗中预览生成结果
 - 一键把结果粘贴回 GitHub PR 描述输入框
 
@@ -37,7 +37,7 @@
 
 1. 在 GitHub 打开一个 Pull Request 页面，或者 Compare 页面
 2. 打开扩展弹窗，点击“`一键生成 PR 描述`”
-3. 扩展抓取当前 Diff，并请求 Kimi 生成总结
+3. 扩展抓取当前 Diff，并请求已配置的 AI 接口生成总结
 4. 你在弹窗中检查结果
 5. 点击“`一键粘贴到 PR 描述`”，自动写回 GitHub 编辑框
 
@@ -49,7 +49,7 @@ flowchart LR
   B --> C["解析当前 URL"]
   C --> D["拼接对应 .diff 地址"]
   D --> E["抓取 Diff 内容"]
-  E --> F["请求 Kimi API 生成摘要"]
+  E --> F["请求 AI API 生成摘要"]
   F --> G["在弹窗中展示结果"]
   G --> H["注入 GitHub PR 描述输入框"]
 ```
@@ -58,7 +58,7 @@ flowchart LR
 
 - 识别支持的 GitHub 页面
 - 请求 Diff 文本
-- 调用 Moonshot / Kimi Chat Completions API
+- 调用兼容 OpenAI Chat Completions 的 AI API
 - 使用 `chrome.scripting` 将结果写入 GitHub textarea
 
 ## 支持的页面
@@ -77,7 +77,7 @@ flowchart LR
 - Node.js 18+
 - npm
 - Chrome 或其他兼容 Chromium 的浏览器
-- 可用的 Kimi API Key
+- 可用的 AI API Key
 
 ### 1. 安装依赖
 
@@ -93,11 +93,17 @@ npm install
 cp .env.example .env
 ```
 
-然后填入你的 Kimi API Key：
+然后按你的模型服务填写配置。
+
+如果你继续使用 Kimi，只填 API Key 也可以，默认值已经指向 Moonshot：
 
 ```bash
-PLASMO_PUBLIC_KIMI_API_KEY=your_kimi_api_key_here
+PLASMO_PUBLIC_AI_API_KEY=your_api_key_here
+PLASMO_PUBLIC_AI_BASE_URL=https://api.moonshot.cn/v1
+PLASMO_PUBLIC_AI_MODEL=moonshot-v1-8k
 ```
+
+如果你接其他兼容 OpenAI Chat Completions 的服务，改成对应的 `Base URL` 和 `Model` 即可。
 
 ### 3. 启动开发构建
 
@@ -143,7 +149,11 @@ build/chrome-mv3-dev
 
 | 变量名 | 说明 |
 | --- | --- |
-| `PLASMO_PUBLIC_KIMI_API_KEY` | Kimi API Key，用于调用 Moonshot 接口 |
+| `PLASMO_PUBLIC_AI_API_KEY` | 通用 AI API Key |
+| `PLASMO_PUBLIC_AI_BASE_URL` | AI 服务基础地址，默认是 `https://api.moonshot.cn/v1` |
+| `PLASMO_PUBLIC_AI_MODEL` | 调用的模型名，默认是 `moonshot-v1-8k` |
+| `PLASMO_PUBLIC_AI_API_URL` | 可选。直接指定完整接口地址；设置后会覆盖 `PLASMO_PUBLIC_AI_BASE_URL` |
+| `PLASMO_PUBLIC_KIMI_API_KEY` | 兼容旧配置的备用变量，未设置 `PLASMO_PUBLIC_AI_API_KEY` 时会回退使用 |
 
 ## 权限说明
 
@@ -157,8 +167,10 @@ build/chrome-mv3-dev
 
 - `https://github.com/*`
 - `https://patch-diff.githubusercontent.com/*`
+- `https://*/*`
+- `http://*/*`
 
-这些权限分别用于识别当前 GitHub 页面、抓取 Diff 和回填 PR 描述。
+这些权限分别用于识别当前 GitHub 页面、抓取 Diff、回填 PR 描述，以及请求你配置的外部 AI 接口。
 
 ## 项目结构
 
@@ -185,7 +197,7 @@ build/chrome-mv3-dev
 ## Roadmap
 
 - [x] 支持从 GitHub PR / Compare 页面抓取 Diff
-- [x] 支持调用 Kimi 生成 PR 描述
+- [x] 支持调用可配置 AI 接口生成 PR 描述
 - [x] 支持一键粘贴到 GitHub PR 描述框
 - [ ] 支持自定义 Prompt / 模板
 - [ ] 支持中英文输出切换
@@ -245,14 +257,14 @@ npm run package
 - TypeScript
 - Plasmo
 - Chrome Extension APIs
-- Moonshot / Kimi API
+- OpenAI 兼容 Chat Completions API
 
 ## 已知限制
 
 - 当前仅支持 GitHub PR / Compare 页面
 - 只对页面中可识别到的 PR 描述 textarea 生效
 - Diff 内容目前会截断到前 `15000` 个字符
-- Kimi API Key 当前直接暴露在浏览器扩展前端环境中
+- AI API Key 当前直接暴露在浏览器扩展前端环境中
 
 ## License
 

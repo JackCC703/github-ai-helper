@@ -1,12 +1,32 @@
 import { useState } from "react"
 
-const kimiApiKey = process.env.PLASMO_PUBLIC_KIMI_API_KEY?.trim() ?? ""
+const legacyKimiApiKey = process.env.PLASMO_PUBLIC_KIMI_API_KEY?.trim() ?? ""
+const aiApiKey =
+  process.env.PLASMO_PUBLIC_AI_API_KEY?.trim() || legacyKimiApiKey
+const aiModel = process.env.PLASMO_PUBLIC_AI_MODEL?.trim() || "moonshot-v1-8k"
+
+const resolveAiApiUrl = () => {
+  const customApiUrl = process.env.PLASMO_PUBLIC_AI_API_URL?.trim()
+
+  if (customApiUrl) {
+    return customApiUrl
+  }
+
+  const baseUrl =
+    process.env.PLASMO_PUBLIC_AI_BASE_URL?.trim() || "https://api.moonshot.cn/v1"
+
+  return `${baseUrl.replace(/\/+$/, "")}/chat/completions`
+}
+
+const aiApiUrl = resolveAiApiUrl()
+const aiRequestMaxAttempts = 3
+const aiRetryDelayMs = 1200
 
 type DiffResult =
   | { ok: true; content: string }
   | { ok: false; message: string }
 
-type KimiResult =
+type AIResult =
   | { ok: true; content: string }
   | { ok: false; message: string }
 
@@ -123,26 +143,55 @@ const getApiErrorMessage = async (response: Response) => {
   }
 }
 
-const askKimi = async (diffContent: string): Promise<KimiResult> => {
-  if (!kimiApiKey) {
+const getApiOriginLabel = (url: string) => {
+  try {
+    return new URL(url).origin
+  } catch {
+    return url
+  }
+}
+
+const sleep = (ms: number) =>
+  new Promise((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
+
+const isRetryableApiFailure = (status: number, errorMessage: string) => {
+  const normalizedMessage = errorMessage.toLowerCase()
+
+  return (
+    status === 429 ||
+    status === 503 ||
+    normalizedMessage.includes("overloaded") ||
+    normalizedMessage.includes("rate limit") ||
+    normalizedMessage.includes("too many requests") ||
+    normalizedMessage.includes("busy")
+  )
+}
+
+const askAi = async (diffContent: string): Promise<AIResult> => {
+  if (!aiApiKey) {
     return {
       ok: false,
       message:
-        "未配置 Kimi API Key。请在项目根目录创建 .env，并设置 PLASMO_PUBLIC_KIMI_API_KEY=你的密钥"
+        "未配置 AI API Key。请在项目根目录创建 .env，并设置 PLASMO_PUBLIC_AI_API_KEY=你的密钥"
     }
   }
 
   try {
-    const response = await fetch(
-      "https://api.moonshot.cn/v1/chat/completions",
-      {
+    for (
+      let attemptIndex = 0;
+      attemptIndex < aiRequestMaxAttempts;
+      attemptIndex += 1
+    ) {
+      const response = await fetch(aiApiUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${kimiApiKey}`
+          Authorization: `Bearer ${aiApiKey}`
         },
         body: JSON.stringify({
-          model: "moonshot-v1-8k",
+          model: aiModel,
           messages: [
             {
               role: "system",
@@ -155,37 +204,58 @@ const askKimi = async (diffContent: string): Promise<KimiResult> => {
           ],
           temperature: 0.3
         })
-      }
-    )
+      })
 
-    if (!response.ok) {
-      const errorMessage = await getApiErrorMessage(response)
+      if (!response.ok) {
+        const errorMessage = await getApiErrorMessage(response)
+        const isRetryable = isRetryableApiFailure(response.status, errorMessage)
+        const hasNextAttempt = attemptIndex < aiRequestMaxAttempts - 1
 
-      return {
-        ok: false,
-        message: `Kimi API 请求失败：${errorMessage}`
+        if (isRetryable && hasNextAttempt) {
+          await sleep(aiRetryDelayMs * (attemptIndex + 1))
+          continue
+        }
+
+        if (isRetryable) {
+          return {
+            ok: false,
+            message:
+              `AI 服务当前繁忙，已自动重试 ${aiRequestMaxAttempts} 次仍失败。` +
+              `请稍后再试，或切换到别的模型/接口。原始错误：${errorMessage}`
+          }
+        }
+
+        return {
+          ok: false,
+          message: `AI API 请求失败：${errorMessage}`
+        }
       }
+
+      const data = await response.json()
+
+      const content = data?.choices?.[0]?.message?.content
+
+      if (!content) {
+        return {
+          ok: false,
+          message: "AI API 已返回响应，但没有拿到生成内容"
+        }
+      }
+
+      return { ok: true, content }
     }
 
-    const data = await response.json()
-
-    const content = data?.choices?.[0]?.message?.content
-
-    if (!content) {
-      return {
-        ok: false,
-        message: "Kimi API 已返回响应，但没有拿到生成内容"
-      }
+    return {
+      ok: false,
+      message: "AI API 请求失败：未获得有效响应"
     }
-
-    return { ok: true, content }
   } catch (error) {
-    console.error("Kimi API 调用失败:", error)
+    console.error("AI API 调用失败:", error)
 
     return {
       ok: false,
       message:
-        "Kimi API 网络异常，请检查当前网络是否能访问 https://api.moonshot.cn"
+        `AI API 网络异常，请检查当前网络是否能访问 ${getApiOriginLabel(aiApiUrl)}`
     }
   }
 }
@@ -214,7 +284,7 @@ function IndexPopup() {
       return
     }
 
-    const aiResult = await askKimi(diff.content)
+    const aiResult = await askAi(diff.content)
 
     if ("message" in aiResult) {
       setStatus(aiResult.message)
