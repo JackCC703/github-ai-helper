@@ -10,6 +10,43 @@ type KimiResult =
   | { ok: true; content: string }
   | { ok: false; message: string }
 
+const prDescriptionSystemPrompt = `
+你是资深工程师，负责根据 Git Diff 生成统一、可直接粘贴到 GitHub 的 PR 描述。
+
+请严格遵守以下要求：
+1. 仅依据提供的 Diff 输出，不要臆测未出现的业务背景、测试结果、风险或需求来源。
+2. 输出语言使用简体中文，格式使用 Markdown。
+3. 必须严格按照下面的模版输出，保留所有一级标题，不能新增一级标题，不能输出标题以外的开场白或结尾。
+4. 每个列表项尽量简洁、明确，优先描述真实改动和评审重点。
+5. 如果某部分无法从 Diff 明确判断，请写“未从 Diff 中明确看出”。
+6. 不要使用代码块包裹整个结果。
+
+输出模版：
+## 变更概述
+- 用 1-2 条概括这次改动解决了什么问题、核心变化是什么。
+
+## 主要改动
+- 按功能点或模块列出 2-4 条关键改动。
+
+## 影响范围
+- 说明受影响的页面、模块、接口、配置或流程。
+
+## 风险与回滚
+- 风险：总结潜在风险；如无法判断则写“未从 Diff 中明确看出”。
+- 回滚：说明回滚方式；如无法判断则写“回滚到变更前版本”。
+
+## 测试说明
+- 列出可从 Diff 推断出的测试、验证方式；如无法判断则写“未从 Diff 中明确看出”。
+
+额外要求：
+- 如果 Diff 明显是前端改动，优先指出交互、文案、样式、状态流转变化。
+- 如果 Diff 明显是后端或基础设施改动，优先指出接口、数据流、配置、兼容性变化。
+- 如果改动很小，也必须完整输出整套模版。
+`.trim()
+
+const buildPrDescriptionUserPrompt = (diffContent: string) =>
+  `请基于下面的 Git Diff 生成 PR 描述。\n\nGit Diff:\n${diffContent}`
+
 const resolveGitHubDiffUrl = (rawUrl: string) => {
   try {
     const parsedUrl = new URL(rawUrl)
@@ -109,10 +146,12 @@ const askKimi = async (diffContent: string): Promise<KimiResult> => {
           messages: [
             {
               role: "system",
-              content:
-                "你是一个代码专家，请根据提供的 Git Diff 编写一份简短的 PR 描述，包含：## 改动点、## 影响范围。"
+              content: prDescriptionSystemPrompt
             },
-            { role: "user", content: `这是代码改动：\n${diffContent}` }
+            {
+              role: "user",
+              content: buildPrDescriptionUserPrompt(diffContent)
+            }
           ],
           temperature: 0.3
         })
