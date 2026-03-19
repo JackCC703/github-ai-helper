@@ -26,10 +26,12 @@
   "manifest": {
     "permissions": [
       "tabs",
-      "storage"
+      "storage",
+      "scripting"
     ],
     "host_permissions": [
-      "https://github.com/*"
+      "https://github.com/*",
+      "https://patch-diff.githubusercontent.com/*"
     ]
   }
 }

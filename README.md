@@ -10,6 +10,18 @@ pnpm dev
 npm run dev
 ```
 
+If you want to use the Kimi API in the popup, create a `.env` file in the project root:
+
+```bash
+cp .env.example .env
+```
+
+Then fill in:
+
+```bash
+PLASMO_PUBLIC_KIMI_API_KEY=your_kimi_api_key_here
+```
+
 Open your browser and load the appropriate development build. For example, if you are developing for the chrome browser, using manifest v3, use: `build/chrome-mv3-dev`.
 
 You can start editing the popup by modifying `popup.tsx`. It should auto-update as you make changes. To add an options page, simply add a `options.tsx` file to the root of the project, with a react component default exported. Likewise to add a content page, add a `content.ts` file to the root of the project, importing some module and do some logic, then reload the extension on your browser.
