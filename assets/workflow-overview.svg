@@ -1,0 +1,142 @@
+<svg width="1600" height="920" viewBox="0 0 1600 920" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">AI PR Helper 工作原理图</title>
+  <desc id="desc">展示 GitHub 页面、浏览器扩展、AI 服务和一键回填之间的数据流转关系。</desc>
+  <defs>
+    <linearGradient id="bg" x1="160" y1="40" x2="1450" y2="860" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8FAFC"/>
+      <stop offset="0.5" stop-color="#FFF7ED"/>
+      <stop offset="1" stop-color="#ECFEFF"/>
+    </linearGradient>
+    <linearGradient id="extGlow" x1="476" y1="160" x2="1118" y2="772" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF1E8"/>
+      <stop offset="1" stop-color="#FFF9F5"/>
+    </linearGradient>
+    <linearGradient id="aiGlow" x1="1194" y1="172" x2="1454" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#DDF8FF"/>
+      <stop offset="1" stop-color="#F3FCFF"/>
+    </linearGradient>
+    <linearGradient id="resultGlow" x1="1194" y1="500" x2="1454" y2="742" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E7FBEF"/>
+      <stop offset="1" stop-color="#F7FFF9"/>
+    </linearGradient>
+    <filter id="shadowLg" x="-40" y="-40" width="1680" height="1000" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="18"/>
+      <feGaussianBlur stdDeviation="20"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0588235 0 0 0 0 0.0901961 0 0 0 0 0.164706 0 0 0 0.12 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
+    </filter>
+    <filter id="shadowSm" x="-20" y="-20" width="1640" height="960" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="10"/>
+      <feGaussianBlur stdDeviation="12"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0588235 0 0 0 0 0.0901961 0 0 0 0 0.164706 0 0 0 0.1 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 14 14" refX="11" refY="7" markerWidth="14" markerHeight="14" orient="auto-start-reverse">
+      <path d="M2 2L11 7L2 12" stroke="#F97316" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="arrowSoft" viewBox="0 0 14 14" refX="11" refY="7" markerWidth="14" markerHeight="14" orient="auto-start-reverse">
+      <path d="M2 2L11 7L2 12" stroke="#14B8A6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" stroke="#E2E8F0" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="1600" height="920" rx="36" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1600" height="920" rx="36" fill="url(#grid)" opacity="0.35"/>
+
+  <g opacity="0.9">
+    <circle cx="132" cy="124" r="10" fill="#FB923C"/>
+    <circle cx="164" cy="124" r="10" fill="#38BDF8"/>
+    <circle cx="196" cy="124" r="10" fill="#4ADE80"/>
+  </g>
+
+  <text x="116" y="190" fill="#0F172A" font-size="46" font-weight="700" font-family="'SF Pro Display','PingFang SC','Microsoft YaHei',sans-serif">
+    AI PR Helper 工作原理
+  </text>
+  <text x="116" y="236" fill="#475569" font-size="24" font-weight="500" font-family="'SF Pro Text','PingFang SC','Microsoft YaHei',sans-serif">
+    从 GitHub Diff 到结构化 PR 描述，全流程在浏览器侧完成，并支持一键回填
+  </text>
+
+  <g filter="url(#shadowLg)">
+    <rect x="92" y="284" width="1416" height="548" rx="32" fill="#FFFFFF" fill-opacity="0.8"/>
+  </g>
+
+  <g filter="url(#shadowSm)">
+    <rect x="128" y="332" width="268" height="452" rx="28" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="2"/>
+    <rect x="160" y="364" width="204" height="48" rx="24" fill="#111827"/>
+    <text x="262" y="395" text-anchor="middle" fill="#FFFFFF" font-size="22" font-weight="700" font-family="'SF Pro Display','PingFang SC','Microsoft YaHei',sans-serif">GitHub 页面</text>
+
+    <rect x="160" y="444" width="204" height="118" rx="22" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="2"/>
+    <text x="262" y="490" text-anchor="middle" fill="#0F172A" font-size="27" font-weight="700" font-family="'SF Pro Display','PingFang SC','Microsoft YaHei',sans-serif">PR / Compare</text>
+    <text x="262" y="528" text-anchor="middle" fill="#64748B" font-size="20" font-weight="500" font-family="'SF Pro Text','PingFang SC','Microsoft YaHei',sans-serif">读取当前页面上下文</text>
+
+    <rect x="160" y="592" width="204" height="152" rx="22" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="2"/>
+    <text x="262" y="640" text-anchor="middle" fill="#0F172A" font-size="26" font-weight="700" font-family="'SF Pro Display','PingFang SC','Microsoft YaHei',sans-serif">PR 描述输入框</text>
+    <text x="262" y="678" text-anchor="middle" fill="#64748B" font-size="20" font-weight="500" font-family="'SF Pro Text','PingFang SC','Microsoft YaHei',sans-serif">接收回填结果</text>
+    <text x="262" y="712" text-anchor="middle" fill="#94A3B8" font-size="18" font-weight="500" font-family="'SF Pro Text','PingFang SC','Microsoft YaHei',sans-serif">自动触发表单事件</text>
+  </g>
+
+  <g filter="url(#shadowSm)">
+    <rect x="470" y="332" width="650" height="452" rx="28" fill="url(#extGlow)" stroke="#FDBA74" stroke-width="2.5"/>
+    <rect x="502" y="364" width="236" height="48" rx="24" fill="#EA580C"/>
+    <text x="620" y="395" text-anchor="middle" fill="#FFFFFF" font-size="22" font-weight="700" font-family="'SF Pro Display','PingFang SC','Microsoft YaHei',sans-serif">浏览器扩展</text>
+
+    <rect x="514" y="442" width="564" height="74" rx="20" fill="#FFFFFF" stroke="#FED7AA" stroke-width="2"/>
+    <circle cx="560" cy="479" r="22" fill="#FFEDD5"/>
+    <text x="560" y="487" text-anchor="middle" fill="#C2410C" font-size="22" font-weight="700" font-family="'SF Pro Display','PingFang SC','Microsoft YaHei',sans-serif">1</text>
+    <text x="608" y="472" fill="#0F172A" font-size="24" font-weight="700" font-family="'SF Pro Display','PingFang SC','Microsoft YaHei',sans-serif">识别 GitHub 页面与 URL</text>
+    <text x="608" y="500" fill="#64748B" font-size="18" font-weight="500" font-family="'SF Pro Text','PingFang SC','Microsoft YaHei',sans-serif">确认当前是 Pull Request 或 Compare 场景</text>
+
+    <rect x="514" y="532" width="564" height="74" rx="20" fill="#FFFFFF" stroke="#FED7AA" stroke-width="2"/>
+    <circle cx="560" cy="569" r="22" fill="#FFEDD5"/>
+    <text x="560" y="577" text-anchor="middle" fill="#C2410C" font-size="22" font-weight="700" font-family="'SF Pro Display','PingFang SC','Microsoft YaHei',sans-serif">2</text>
+    <text x="608" y="562" fill="#0F172A" font-size="24" font-weight="700" font-family="'SF Pro Display','PingFang SC','Microsoft YaHei',sans-serif">拼接 .diff 地址并抓取内容</text>
+    <text x="608" y="590" fill="#64748B" font-size="18" font-weight="500" font-family="'SF Pro Text','PingFang SC','Microsoft YaHei',sans-serif">必要时截断长文本，降低上下文体积</text>
+
+    <rect x="514" y="622" width="564" height="74" rx="20" fill="#FFFFFF" stroke="#FED7AA" stroke-width="2"/>
+    <circle cx="560" cy="659" r="22" fill="#FFEDD5"/>
+    <text x="560" y="667" text-anchor="middle" fill="#C2410C" font-size="22" font-weight="700" font-family="'SF Pro Display','PingFang SC','Microsoft YaHei',sans-serif">3</text>
+    <text x="608" y="652" fill="#0F172A" font-size="24" font-weight="700" font-family="'SF Pro Display','PingFang SC','Microsoft YaHei',sans-serif">组合提示词并请求 AI 总结</text>
+    <text x="608" y="680" fill="#64748B" font-size="18" font-weight="500" font-family="'SF Pro Text','PingFang SC','Microsoft YaHei',sans-serif">统一输出 PR 描述结构，减少人工整理成本</text>
+
+    <rect x="514" y="712" width="564" height="74" rx="20" fill="#FFFFFF" stroke="#FED7AA" stroke-width="2"/>
+    <circle cx="560" cy="749" r="22" fill="#FFEDD5"/>
+    <text x="560" y="757" text-anchor="middle" fill="#C2410C" font-size="22" font-weight="700" font-family="'SF Pro Display','PingFang SC','Microsoft YaHei',sans-serif">4</text>
+    <text x="608" y="742" fill="#0F172A" font-size="24" font-weight="700" font-family="'SF Pro Display','PingFang SC','Microsoft YaHei',sans-serif">弹窗预览，确认后一键回填</text>
+    <text x="608" y="770" fill="#64748B" font-size="18" font-weight="500" font-family="'SF Pro Text','PingFang SC','Microsoft YaHei',sans-serif">通过脚本注入写回 GitHub textarea</text>
+  </g>
+
+  <g filter="url(#shadowSm)">
+    <rect x="1198" y="332" width="274" height="192" rx="28" fill="url(#aiGlow)" stroke="#67E8F9" stroke-width="2.5"/>
+    <rect x="1230" y="364" width="162" height="48" rx="24" fill="#0891B2"/>
+    <text x="1311" y="395" text-anchor="middle" fill="#FFFFFF" font-size="22" font-weight="700" font-family="'SF Pro Display','PingFang SC','Microsoft YaHei',sans-serif">AI 服务</text>
+    <text x="1335" y="456" text-anchor="middle" fill="#0F172A" font-size="28" font-weight="700" font-family="'SF Pro Display','PingFang SC','Microsoft YaHei',sans-serif">Chat Completions</text>
+    <text x="1335" y="494" text-anchor="middle" fill="#4B5563" font-size="20" font-weight="500" font-family="'SF Pro Text','PingFang SC','Microsoft YaHei',sans-serif">兼容 OpenAI 协议</text>
+  </g>
+
+  <g filter="url(#shadowSm)">
+    <rect x="1198" y="560" width="274" height="192" rx="28" fill="url(#resultGlow)" stroke="#86EFAC" stroke-width="2.5"/>
+    <rect x="1230" y="592" width="162" height="48" rx="24" fill="#16A34A"/>
+    <text x="1311" y="623" text-anchor="middle" fill="#FFFFFF" font-size="22" font-weight="700" font-family="'SF Pro Display','PingFang SC','Microsoft YaHei',sans-serif">返回结果</text>
+    <text x="1335" y="684" text-anchor="middle" fill="#0F172A" font-size="29" font-weight="700" font-family="'SF Pro Display','PingFang SC','Microsoft YaHei',sans-serif">Markdown PR 描述</text>
+    <text x="1335" y="722" text-anchor="middle" fill="#4B5563" font-size="20" font-weight="500" font-family="'SF Pro Text','PingFang SC','Microsoft YaHei',sans-serif">可继续人工润色</text>
+  </g>
+
+  <path d="M396 505C432 505 446 479 470 479" stroke="#F97316" stroke-width="4" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <path d="M1120 570C1150 570 1164 447 1198 447" stroke="#F97316" stroke-width="4" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <path d="M1335 524C1335 536 1335 544 1335 560" stroke="#14B8A6" stroke-width="4" stroke-linecap="round" marker-end="url(#arrowSoft)"/>
+  <path d="M1198 656C1158 656 1142 749 1120 749" stroke="#16A34A" stroke-width="4" stroke-linecap="round" marker-end="url(#arrowSoft)"/>
+  <path d="M470 749C446 749 430 668 396 668" stroke="#16A34A" stroke-width="4" stroke-linecap="round" marker-end="url(#arrowSoft)"/>
+
+  <g>
+    <rect x="112" y="98" width="258" height="40" rx="20" fill="#FFFFFF" fill-opacity="0.74" stroke="#E2E8F0"/>
+    <text x="241" y="124" text-anchor="middle" fill="#475569" font-size="18" font-weight="600" font-family="'SF Pro Text','PingFang SC','Microsoft YaHei',sans-serif">Browser-side workflow overview</text>
+  </g>
+</svg>
