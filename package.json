@@ -27,11 +27,14 @@
     "permissions": [
       "tabs",
       "storage",
-      "scripting"
+      "scripting",
+      "permissions"
     ],
     "host_permissions": [
       "https://github.com/*",
-      "https://patch-diff.githubusercontent.com/*",
+      "https://patch-diff.githubusercontent.com/*"
+    ],
+    "optional_host_permissions": [
       "https://*/*",
       "http://*/*"
     ]

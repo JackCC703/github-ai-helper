@@ -1,326 +1,317 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
-const legacyKimiApiKey = process.env.PLASMO_PUBLIC_KIMI_API_KEY?.trim() ?? ""
-const aiApiKey =
-  process.env.PLASMO_PUBLIC_AI_API_KEY?.trim() || legacyKimiApiKey
-const aiModel = process.env.PLASMO_PUBLIC_AI_MODEL?.trim() || "moonshot-v1-8k"
+import { askAi, fetchDiff, testAiConnection } from "./lib/ai"
+import {
+  clearAiSettings,
+  createDefaultAiSettings,
+  getApiOriginPattern,
+  hasRequiredAiSettings,
+  loadAiSettings,
+  maskApiKey,
+  resolveAiApiUrl,
+  sanitizeAiSettings,
+  saveAiSettings,
+  type AiSettings
+} from "./lib/settings"
 
-const resolveAiApiUrl = () => {
-  const customApiUrl = process.env.PLASMO_PUBLIC_AI_API_URL?.trim()
-
-  if (customApiUrl) {
-    return customApiUrl
-  }
-
-  const baseUrl =
-    process.env.PLASMO_PUBLIC_AI_BASE_URL?.trim() || "https://api.moonshot.cn/v1"
-
-  return `${baseUrl.replace(/\/+$/, "")}/chat/completions`
+type ViewMode = "generate" | "settings"
+type NoticeLevel = "success" | "error" | "info"
+type Notice = {
+  level: NoticeLevel
+  text: string
 }
 
-const aiApiUrl = resolveAiApiUrl()
-const aiRequestMaxAttempts = 3
-const aiRetryDelayMs = 1200
+type PermissionStatus = "checking" | "granted" | "missing" | "invalid"
 
-type DiffResult =
-  | { ok: true; content: string }
-  | { ok: false; message: string }
-
-type AIResult =
-  | { ok: true; content: string }
-  | { ok: false; message: string }
-
-const prDescriptionSystemPrompt = `
-你是资深工程师，负责根据 Git Diff 生成统一、可直接粘贴到 GitHub 的 PR 描述。
-
-请严格遵守以下要求：
-1. 仅依据提供的 Diff 输出，不要臆测未出现的业务背景、测试结果、风险或需求来源。
-2. 输出语言使用简体中文，格式使用 Markdown。
-3. 必须严格按照下面的模版输出，保留所有一级标题，不能新增一级标题，不能输出标题以外的开场白或结尾。
-4. 每个列表项尽量简洁、明确，优先描述真实改动和评审重点。
-5. 如果某部分无法从 Diff 明确判断，请写“未从 Diff 中明确看出”。
-6. 不要使用代码块包裹整个结果。
-
-输出模版：
-## 变更概述
-- 用 1-2 条概括这次改动解决了什么问题、核心变化是什么。
-
-## 主要改动
-- 按功能点或模块列出 2-4 条关键改动。
-
-## 影响范围
-- 说明受影响的页面、模块、接口、配置或流程。
-
-## 风险与回滚
-- 风险：总结潜在风险；如无法判断则写“未从 Diff 中明确看出”。
-- 回滚：说明回滚方式；如无法判断则写“回滚到变更前版本”。
-
-## 测试说明
-- 列出可从 Diff 推断出的测试、验证方式；如无法判断则写“未从 Diff 中明确看出”。
-
-额外要求：
-- 如果 Diff 明显是前端改动，优先指出交互、文案、样式、状态流转变化。
-- 如果 Diff 明显是后端或基础设施改动，优先指出接口、数据流、配置、兼容性变化。
-- 如果改动很小，也必须完整输出整套模版。
-`.trim()
-
-const buildPrDescriptionUserPrompt = (diffContent: string) =>
-  `请基于下面的 Git Diff 生成 PR 描述。\n\nGit Diff:\n${diffContent}`
-
-const resolveGitHubDiffUrl = (rawUrl: string) => {
-  try {
-    const parsedUrl = new URL(rawUrl)
-    const pullMatch = parsedUrl.pathname.match(
-      /^\/([^/]+)\/([^/]+)\/pull\/(\d+)/
-    )
-
-    if (pullMatch) {
-      return `${parsedUrl.origin}/${pullMatch[1]}/${pullMatch[2]}/pull/${pullMatch[3]}.diff`
-    }
-
-    if (parsedUrl.pathname.includes("/compare/")) {
-      return `${parsedUrl.origin}${parsedUrl.pathname}.diff`
-    }
-
-    return null
-  } catch (error) {
-    console.error("URL 解析失败:", error)
-    return null
+const getPermissionStatusText = (status: PermissionStatus) => {
+  switch (status) {
+    case "granted":
+      return "已授权"
+    case "missing":
+      return "未授权"
+    case "invalid":
+      return "地址无效"
+    default:
+      return "检查中"
   }
 }
 
-const fetchDiff = async (url: string): Promise<DiffResult> => {
-  const diffUrl = resolveGitHubDiffUrl(url)
-
-  if (!diffUrl) {
-    return {
-      ok: false,
-      message: "请在 GitHub Pull Request 或 Compare 页面使用我"
-    }
-  }
-
+const getApiTargetLabel = (settings: AiSettings) => {
   try {
-    const response = await fetch(diffUrl)
-
-    if (!response.ok) {
-      return {
-        ok: false,
-        message: `抓取 Diff 失败，GitHub 返回了 ${response.status} ${response.statusText}`
-      }
-    }
-
-    const text = await response.text()
-
-    if (!text.trim()) {
-      return {
-        ok: false,
-        message: "抓取到的 Diff 为空，请确认当前页面是可访问的 GitHub PR 或 Compare 页面"
-      }
-    }
-
-    return { ok: true, content: text.slice(0, 15000) } // 截取一部分，防止文本太长
-  } catch (error) {
-    console.error("抓取失败:", error)
-
-    return {
-      ok: false,
-      message: "抓取 Diff 时网络异常，请检查当前网络是否能访问 GitHub"
-    }
-  }
-}
-
-const getApiErrorMessage = async (response: Response) => {
-  try {
-    const data = await response.json()
-
-    return (
-      data?.error?.message ||
-      data?.message ||
-      `${response.status} ${response.statusText}`
-    )
+    return new URL(resolveAiApiUrl(settings)).origin
   } catch {
-    return `${response.status} ${response.statusText}`
+    return "未配置"
   }
 }
 
-const getApiOriginLabel = (url: string) => {
-  try {
-    return new URL(url).origin
-  } catch {
-    return url
-  }
-}
-
-const sleep = (ms: number) =>
-  new Promise((resolve) => {
-    window.setTimeout(resolve, ms)
-  })
-
-const isRetryableApiFailure = (status: number, errorMessage: string) => {
-  const normalizedMessage = errorMessage.toLowerCase()
-
-  return (
-    status === 429 ||
-    status === 503 ||
-    normalizedMessage.includes("overloaded") ||
-    normalizedMessage.includes("rate limit") ||
-    normalizedMessage.includes("too many requests") ||
-    normalizedMessage.includes("busy")
-  )
-}
-
-const askAi = async (diffContent: string): Promise<AIResult> => {
-  if (!aiApiKey) {
+const getNoticeStyle = (level: NoticeLevel) => {
+  if (level === "success") {
     return {
-      ok: false,
-      message:
-        "未配置 AI API Key。请在项目根目录创建 .env，并设置 PLASMO_PUBLIC_AI_API_KEY=你的密钥"
+      backgroundColor: "rgba(16, 185, 129, 0.14)",
+      borderColor: "rgba(16, 185, 129, 0.4)",
+      color: "#065f46"
     }
   }
 
-  try {
-    for (
-      let attemptIndex = 0;
-      attemptIndex < aiRequestMaxAttempts;
-      attemptIndex += 1
-    ) {
-      const response = await fetch(aiApiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${aiApiKey}`
-        },
-        body: JSON.stringify({
-          model: aiModel,
-          messages: [
-            {
-              role: "system",
-              content: prDescriptionSystemPrompt
-            },
-            {
-              role: "user",
-              content: buildPrDescriptionUserPrompt(diffContent)
-            }
-          ],
-          temperature: 0.3
-        })
-      })
-
-      if (!response.ok) {
-        const errorMessage = await getApiErrorMessage(response)
-        const isRetryable = isRetryableApiFailure(response.status, errorMessage)
-        const hasNextAttempt = attemptIndex < aiRequestMaxAttempts - 1
-
-        if (isRetryable && hasNextAttempt) {
-          await sleep(aiRetryDelayMs * (attemptIndex + 1))
-          continue
-        }
-
-        if (isRetryable) {
-          return {
-            ok: false,
-            message:
-              `AI 服务当前繁忙，已自动重试 ${aiRequestMaxAttempts} 次仍失败。` +
-              `请稍后再试，或切换到别的模型/接口。原始错误：${errorMessage}`
-          }
-        }
-
-        return {
-          ok: false,
-          message: `AI API 请求失败：${errorMessage}`
-        }
-      }
-
-      const data = await response.json()
-
-      const content = data?.choices?.[0]?.message?.content
-
-      if (!content) {
-        return {
-          ok: false,
-          message: "AI API 已返回响应，但没有拿到生成内容"
-        }
-      }
-
-      return { ok: true, content }
-    }
-
+  if (level === "error") {
     return {
-      ok: false,
-      message: "AI API 请求失败：未获得有效响应"
+      backgroundColor: "rgba(248, 113, 113, 0.16)",
+      borderColor: "rgba(248, 113, 113, 0.45)",
+      color: "#7f1d1d"
     }
-  } catch (error) {
-    console.error("AI API 调用失败:", error)
+  }
 
-    return {
-      ok: false,
-      message:
-        `AI API 网络异常，请检查当前网络是否能访问 ${getApiOriginLabel(aiApiUrl)}`
-    }
+  return {
+    backgroundColor: "rgba(56, 189, 248, 0.16)",
+    borderColor: "rgba(56, 189, 248, 0.45)",
+    color: "#0c4a6e"
   }
 }
+
+const getPrimaryButtonStyle = (disabled: boolean) => ({
+  width: "100%",
+  border: "none",
+  borderRadius: 14,
+  padding: "11px 14px",
+  fontSize: 13,
+  fontWeight: 700,
+  letterSpacing: 0.3,
+  color: "#f8fafc",
+  background: disabled
+    ? "linear-gradient(140deg, #94a3b8 0%, #64748b 100%)"
+    : "linear-gradient(140deg, #0f766e 0%, #0ea5e9 100%)",
+  boxShadow: disabled ? "none" : "0 12px 24px rgba(14, 116, 144, 0.28)",
+  cursor: disabled ? "not-allowed" : "pointer",
+  transition: "all 180ms ease"
+})
+
+const getSecondaryButtonStyle = (disabled: boolean) => ({
+  width: "100%",
+  border: "1px solid rgba(15, 118, 110, 0.22)",
+  borderRadius: 12,
+  padding: "10px 12px",
+  fontSize: 12,
+  fontWeight: 600,
+  color: "#0f172a",
+  backgroundColor: disabled ? "rgba(148, 163, 184, 0.14)" : "#ffffff",
+  cursor: disabled ? "not-allowed" : "pointer",
+  transition: "all 180ms ease"
+})
+
+const getTabButtonStyle = (active: boolean) => ({
+  flex: 1,
+  border: "none",
+  borderRadius: 10,
+  padding: "9px 8px",
+  fontSize: 12,
+  fontWeight: 700,
+  letterSpacing: 0.2,
+  color: active ? "#ecfeff" : "#0f172a",
+  background: active
+    ? "linear-gradient(140deg, #155e75 0%, #2563eb 100%)"
+    : "transparent",
+  cursor: "pointer",
+  transition: "all 180ms ease"
+})
 
 function IndexPopup() {
-  const [url, setUrl] = useState("")
+  const [activeView, setActiveView] = useState<ViewMode>("generate")
+  const [settings, setSettings] = useState<AiSettings>(createDefaultAiSettings())
+  const [settingsLoaded, setSettingsLoaded] = useState(false)
+  const [permissionStatus, setPermissionStatus] =
+    useState<PermissionStatus>("checking")
+
+  const [currentTabUrl, setCurrentTabUrl] = useState("")
   const [result, setResult] = useState("")
-  const [status, setStatus] = useState("")
   const [loading, setLoading] = useState(false)
   const [pasting, setPasting] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [notice, setNotice] = useState<Notice | null>(null)
+
+  const updatePermissionStatus = async (nextSettings: AiSettings) => {
+    if (!nextSettings.apiUrl.trim() && !nextSettings.baseUrl.trim()) {
+      setPermissionStatus("missing")
+      return false
+    }
+
+    let originPattern = ""
+
+    try {
+      originPattern = getApiOriginPattern(nextSettings)
+    } catch {
+      setPermissionStatus("invalid")
+      return false
+    }
+
+    try {
+      const granted = await chrome.permissions.contains({
+        origins: [originPattern]
+      })
+
+      setPermissionStatus(granted ? "granted" : "missing")
+      return granted
+    } catch (error) {
+      console.error("check permission failed:", error)
+      setPermissionStatus("missing")
+      return false
+    }
+  }
+
+  const ensureApiPermission = async (
+    nextSettings: AiSettings,
+    requestIfMissing: boolean
+  ) => {
+    let originPattern = ""
+
+    try {
+      originPattern = getApiOriginPattern(nextSettings)
+    } catch {
+      setPermissionStatus("invalid")
+      return false
+    }
+
+    try {
+      const contains = await chrome.permissions.contains({
+        origins: [originPattern]
+      })
+
+      if (contains) {
+        setPermissionStatus("granted")
+        return true
+      }
+
+      if (!requestIfMissing) {
+        setPermissionStatus("missing")
+        return false
+      }
+
+      const granted = await chrome.permissions.request({
+        origins: [originPattern]
+      })
+
+      setPermissionStatus(granted ? "granted" : "missing")
+      return granted
+    } catch (error) {
+      console.error("request permission failed:", error)
+      setPermissionStatus("missing")
+      return false
+    }
+  }
+
+  useEffect(() => {
+    let disposed = false
+
+    const init = async () => {
+      try {
+        const [tab] = await chrome.tabs.query({
+          active: true,
+          currentWindow: true
+        })
+
+        if (!disposed) {
+          setCurrentTabUrl(tab?.url ?? "")
+        }
+      } catch (error) {
+        console.error("read active tab failed:", error)
+      }
+
+      const loadedSettings = await loadAiSettings()
+
+      if (disposed) return
+
+      setSettings(loadedSettings)
+      setSettingsLoaded(true)
+      await updatePermissionStatus(loadedSettings)
+    }
+
+    void init()
+
+    return () => {
+      disposed = true
+    }
+  }, [])
 
   const handleGenerate = async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-    if (!tab?.url) return
 
-    setUrl(tab.url)
-    setLoading(true)
+    if (!tab?.url) {
+      setNotice({ level: "error", text: "没有找到当前页面，请刷新后再试。" })
+      return
+    }
+
+    setCurrentTabUrl(tab.url)
+    setNotice(null)
     setResult("")
-    setStatus("")
 
-    const diff = await fetchDiff(tab.url)
-
-    if ("message" in diff) {
-      setStatus(diff.message)
-      setLoading(false)
+    if (!hasRequiredAiSettings(settings)) {
+      setActiveView("settings")
+      setNotice({
+        level: "error",
+        text: "请先在设置页填写 API Key、接口地址和模型。"
+      })
       return
     }
 
-    const aiResult = await askAi(diff.content)
+    const granted = await ensureApiPermission(settings, true)
 
-    if ("message" in aiResult) {
-      setStatus(aiResult.message)
-      setLoading(false)
+    if (!granted) {
+      setActiveView("settings")
+      setNotice({
+        level: "error",
+        text: "尚未授权当前接口域名。请在设置页点击保存或授权后再试。"
+      })
       return
     }
 
-    setResult(aiResult.content)
-    setLoading(false)
+    setLoading(true)
+
+    try {
+      const diff = await fetchDiff(tab.url)
+
+      if (!diff.ok) {
+        setNotice({ level: "error", text: diff.message })
+        return
+      }
+
+      const aiResult = await askAi(diff.content, settings)
+
+      if (!aiResult.ok) {
+        setNotice({ level: "error", text: aiResult.message })
+        return
+      }
+
+      setResult(aiResult.content)
+      setNotice({ level: "success", text: "PR 描述已生成，可直接粘贴回 GitHub。" })
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handlePaste = async () => {
     if (!result) return
 
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+
     if (!tab?.id) {
-      setStatus("没有找到当前标签页")
+      setNotice({ level: "error", text: "没有找到当前标签页。" })
       return
     }
 
     setPasting(true)
-    setStatus("")
 
     try {
       const [injectionResult] = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         args: [result],
         func: (content: string) => {
-          const isVisible = (element: HTMLElement | null) => {
-            if (!element) return false
-            return Boolean(
-              element.offsetWidth ||
-              element.offsetHeight ||
-              element.getClientRects().length
+          const isVisibleInPage = (element: HTMLElement | null) =>
+            Boolean(
+              element &&
+                (element.offsetWidth ||
+                  element.offsetHeight ||
+                  element.getClientRects().length)
             )
-          }
 
           const textareaSelectors = [
             "textarea#pull_request_body",
@@ -332,11 +323,11 @@ function IndexPopup() {
               .map((selector) =>
                 document.querySelector<HTMLTextAreaElement>(selector)
               )
-              .find((element) => Boolean(element && isVisible(element))) ??
+              .find((element) => Boolean(element && isVisibleInPage(element))) ??
             Array.from(
               document.querySelectorAll<HTMLTextAreaElement>("textarea")
             ).find((element) => {
-              if (!isVisible(element)) return false
+              if (!isVisibleInPage(element)) return false
 
               const elementKey = `${element.id} ${element.name}`.toLowerCase()
               return (
@@ -347,7 +338,7 @@ function IndexPopup() {
             null
 
           if (!textarea) {
-            return "没有找到 PR 描述输入框，请先打开 GitHub 的 PR 描述编辑框"
+            return "没有找到 PR 描述输入框，请先打开 GitHub 的 PR 描述编辑框。"
           }
 
           const nativeSetter = Object.getOwnPropertyDescriptor(
@@ -367,88 +358,487 @@ function IndexPopup() {
           textarea.setSelectionRange(content.length, content.length)
           textarea.scrollIntoView({ behavior: "smooth", block: "center" })
 
-          return "已粘贴到 GitHub PR 描述输入框"
+          return "已粘贴到 GitHub PR 描述输入框。"
         }
       })
 
-      setStatus(injectionResult?.result ?? "粘贴完成")
+      setNotice({
+        level: "success",
+        text: injectionResult?.result ?? "粘贴完成。"
+      })
     } catch (error) {
-      console.error("粘贴失败:", error)
-      setStatus("粘贴失败，请确认当前页面是 GitHub PR 页面并已打开描述输入框")
+      console.error("paste failed:", error)
+      setNotice({
+        level: "error",
+        text: "粘贴失败，请确认当前页面是 GitHub PR 页面且描述编辑框已展开。"
+      })
     } finally {
       setPasting(false)
     }
   }
 
+  const handleSaveSettings = async () => {
+    const sanitized = sanitizeAiSettings(settings)
+
+    if (!hasRequiredAiSettings(sanitized)) {
+      setNotice({
+        level: "error",
+        text: "请完整填写 API Key、模型、以及 Base URL 或 API URL。"
+      })
+      return
+    }
+
+    setSaving(true)
+
+    try {
+      await saveAiSettings(sanitized)
+      setSettings(sanitized)
+
+      const granted = await ensureApiPermission(sanitized, true)
+
+      if (granted) {
+        setNotice({
+          level: "success",
+          text: "配置已保存，并已授权接口域名。"
+        })
+      } else {
+        setNotice({
+          level: "info",
+          text: "配置已保存，但接口域名尚未授权，生成时会失败。"
+        })
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleTestConnection = async () => {
+    const sanitized = sanitizeAiSettings(settings)
+
+    if (!hasRequiredAiSettings(sanitized)) {
+      setNotice({
+        level: "error",
+        text: "请先填写完整配置再测试连接。"
+      })
+      return
+    }
+
+    const granted = await ensureApiPermission(sanitized, true)
+
+    if (!granted) {
+      setNotice({
+        level: "error",
+        text: "需要先授权该接口域名后才能测试连接。"
+      })
+      return
+    }
+
+    setTesting(true)
+
+    try {
+      const connectionResult = await testAiConnection(sanitized)
+
+      if (!connectionResult.ok) {
+        setNotice({ level: "error", text: connectionResult.message })
+        return
+      }
+
+      setNotice({
+        level: "success",
+        text: `连接成功：${connectionResult.content.trim()}`
+      })
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  const handleGrantPermission = async () => {
+    const granted = await ensureApiPermission(settings, true)
+
+    if (granted) {
+      setNotice({ level: "success", text: "接口域名授权成功。" })
+      return
+    }
+
+    setNotice({
+      level: "error",
+      text: "接口域名授权未通过，请重试或检查接口地址是否正确。"
+    })
+  }
+
+  const handleClearSettings = async () => {
+    await clearAiSettings()
+
+    const nextSettings = createDefaultAiSettings()
+    setSettings(nextSettings)
+    setResult("")
+    setNotice({ level: "info", text: "本地配置已清空。" })
+    await updatePermissionStatus(nextSettings)
+  }
+
+  const endpointLabel = (() => {
+    try {
+      return resolveAiApiUrl(settings)
+    } catch {
+      return "地址无效"
+    }
+  })()
+
   return (
-    <div style={{ padding: 16, width: 300 }}>
-      <h3 style={{ marginBottom: 12 }}>AI PR Helper</h3>
+    <div
+      style={{
+        width: 376,
+        minHeight: 560,
+        padding: 16,
+        color: "#0f172a",
+        fontFamily:
+          '"Avenir Next", "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif',
+        background:
+          "radial-gradient(circle at 8% 0%, rgba(14, 165, 233, 0.25), transparent 28%), radial-gradient(circle at 90% 10%, rgba(20, 184, 166, 0.18), transparent 30%), #f3f9ff",
+        animation: "fadeIn 260ms ease"
+      }}>
+      <style>
+        {`
+          @keyframes fadeIn {
+            from {
+              opacity: 0;
+              transform: translateY(6px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+        `}
+      </style>
 
-      <button
-        onClick={handleGenerate}
-        disabled={loading}
+      <div
         style={{
-          width: "100%",
-          padding: "8px",
-          cursor: loading ? "not-allowed" : "pointer",
-          backgroundColor: "#2ea44f",
-          color: "white",
-          border: "none",
-          borderRadius: "4px"
+          borderRadius: 18,
+          padding: "14px 14px 12px",
+          border: "1px solid rgba(148, 163, 184, 0.28)",
+          background:
+            "linear-gradient(130deg, rgba(255,255,255,0.92) 0%, rgba(239, 246, 255, 0.9) 100%)",
+          boxShadow: "0 14px 28px rgba(14, 116, 144, 0.12)"
         }}>
-        {loading ? "AI 正在分析中..." : "一键生成 PR 描述"}
-      </button>
-
-      {result && (
-        <>
-          <button
-            onClick={handlePaste}
-            disabled={pasting}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 4
+          }}>
+          <strong style={{ fontSize: 15, letterSpacing: 0.3 }}>
+            AI PR Helper
+          </strong>
+          <span
             style={{
-              width: "100%",
-              padding: "8px",
-              marginTop: 12,
-              cursor: pasting ? "not-allowed" : "pointer",
-              backgroundColor: "#0969da",
-              color: "white",
-              border: "none",
-              borderRadius: "4px"
+              padding: "3px 8px",
+              borderRadius: 999,
+              fontSize: 11,
+              fontWeight: 700,
+              color:
+                settingsLoaded && hasRequiredAiSettings(settings)
+                  ? "#065f46"
+                  : "#92400e",
+              backgroundColor:
+                settingsLoaded && hasRequiredAiSettings(settings)
+                  ? "rgba(16,185,129,0.16)"
+                  : "rgba(251,191,36,0.22)"
             }}>
-            {pasting ? "正在粘贴..." : "一键粘贴到 PR 描述"}
+            {settingsLoaded && hasRequiredAiSettings(settings) ? "可生成" : "待配置"}
+          </span>
+        </div>
+
+        <div
+          style={{
+            fontSize: 12,
+            color: "#334155",
+            lineHeight: 1.45
+          }}>
+          把 GitHub Diff 一键整理成结构化 PR 描述，并直接回填。
+        </div>
+      </div>
+
+      <div
+        style={{
+          marginTop: 12,
+          display: "flex",
+          gap: 6,
+          borderRadius: 14,
+          padding: 5,
+          backgroundColor: "rgba(148, 163, 184, 0.2)",
+          border: "1px solid rgba(148, 163, 184, 0.22)"
+        }}>
+        <button
+          onClick={() => setActiveView("generate")}
+          style={getTabButtonStyle(activeView === "generate")}>
+          生成
+        </button>
+        <button
+          onClick={() => setActiveView("settings")}
+          style={getTabButtonStyle(activeView === "settings")}>
+          设置
+        </button>
+      </div>
+
+      {notice && (
+        <div
+          style={{
+            marginTop: 10,
+            borderRadius: 12,
+            border: "1px solid",
+            padding: "8px 10px",
+            fontSize: 12,
+            lineHeight: 1.45,
+            ...getNoticeStyle(notice.level)
+          }}>
+          {notice.text}
+        </div>
+      )}
+
+      {activeView === "generate" ? (
+        <div
+          style={{
+            marginTop: 12,
+            borderRadius: 16,
+            padding: 12,
+            backgroundColor: "rgba(255, 255, 255, 0.88)",
+            border: "1px solid rgba(148, 163, 184, 0.26)",
+            boxShadow: "0 12px 24px rgba(148, 163, 184, 0.12)"
+          }}>
+          <div
+            style={{
+              fontSize: 11,
+              color: "#475569",
+              marginBottom: 8,
+              wordBreak: "break-all"
+            }}>
+            当前页面: {currentTabUrl || "未读取到标签页 URL"}
+          </div>
+
+          <button
+            onClick={handleGenerate}
+            disabled={loading}
+            style={getPrimaryButtonStyle(loading)}>
+            {loading ? "AI 正在分析 Diff..." : "一键生成 PR 描述"}
           </button>
+
+          {result && (
+            <div style={{ marginTop: 10 }}>
+              <button
+                onClick={handlePaste}
+                disabled={pasting}
+                style={getSecondaryButtonStyle(pasting)}>
+                {pasting ? "正在粘贴..." : "一键粘贴到 GitHub 描述框"}
+              </button>
+            </div>
+          )}
 
           <div
             style={{
-              marginTop: 16,
-              padding: 8,
-              backgroundColor: "#f6f8fa",
-              borderRadius: 4,
-              fontSize: 12,
-              border: "1px solid #d0d7de"
+              marginTop: 12,
+              borderRadius: 12,
+              padding: 10,
+              border: "1px solid rgba(148, 163, 184, 0.26)",
+              backgroundColor: "rgba(248, 250, 252, 0.9)"
             }}>
-            <strong style={{ display: "block", marginBottom: 4 }}>
-              AI 建议：
-            </strong>
-            <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{result}</pre>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 8
+              }}>
+              <strong style={{ fontSize: 12 }}>AI 输出预览</strong>
+              <span style={{ fontSize: 11, color: "#475569" }}>
+                {result ? "已生成" : "等待生成"}
+              </span>
+            </div>
+
+            <pre
+              style={{
+                margin: 0,
+                minHeight: 120,
+                maxHeight: 240,
+                overflow: "auto",
+                padding: 8,
+                borderRadius: 10,
+                fontSize: 12,
+                lineHeight: 1.45,
+                whiteSpace: "pre-wrap",
+                backgroundColor: "#ffffff",
+                border: "1px solid rgba(148, 163, 184, 0.24)"
+              }}>
+              {result || "生成后会在这里显示结构化 PR 描述。"}
+            </pre>
           </div>
-        </>
-      )}
 
-      {status && (
-        <p
+          <div
+            style={{
+              marginTop: 10,
+              fontSize: 11,
+              color: "#334155",
+              lineHeight: 1.5,
+              borderRadius: 12,
+              padding: 10,
+              backgroundColor: "rgba(255, 255, 255, 0.74)",
+              border: "1px dashed rgba(51, 65, 85, 0.24)"
+            }}>
+            发送目标: {getApiTargetLabel(settings)} | 域名权限:
+            {` ${getPermissionStatusText(permissionStatus)} | `}
+            Key: {maskApiKey(settings.apiKey)}
+          </div>
+        </div>
+      ) : (
+        <div
           style={{
-            fontSize: 12,
-            color: "#57606a",
             marginTop: 12,
-            marginBottom: 0
+            borderRadius: 16,
+            padding: 12,
+            backgroundColor: "rgba(255, 255, 255, 0.9)",
+            border: "1px solid rgba(148, 163, 184, 0.26)",
+            boxShadow: "0 12px 24px rgba(148, 163, 184, 0.12)"
           }}>
-          {status}
-        </p>
-      )}
+          <div style={{ fontSize: 11, color: "#475569", marginBottom: 10 }}>
+            配置仅保存在当前浏览器本地。点击保存时会按接口域名申请权限。
+          </div>
 
-      <p style={{ fontSize: 10, color: "#666", marginTop: 12 }}>
-        当前页面: {url}
-      </p>
+          <div style={{ display: "grid", gap: 8 }}>
+            <label style={{ fontSize: 11, color: "#334155" }}>API Key</label>
+            <input
+              type="password"
+              value={settings.apiKey}
+              onChange={(event) =>
+                setSettings((prev) => ({ ...prev, apiKey: event.target.value }))
+              }
+              placeholder="sk-..."
+              style={{
+                borderRadius: 10,
+                border: "1px solid rgba(148, 163, 184, 0.4)",
+                backgroundColor: "#fff",
+                padding: "9px 10px",
+                fontSize: 12
+              }}
+            />
+
+            <label style={{ fontSize: 11, color: "#334155" }}>
+              Base URL (可选，和 API URL 二选一)
+            </label>
+            <input
+              type="text"
+              value={settings.baseUrl}
+              onChange={(event) =>
+                setSettings((prev) => ({ ...prev, baseUrl: event.target.value }))
+              }
+              placeholder="https://api.moonshot.cn/v1"
+              style={{
+                borderRadius: 10,
+                border: "1px solid rgba(148, 163, 184, 0.4)",
+                backgroundColor: "#fff",
+                padding: "9px 10px",
+                fontSize: 12
+              }}
+            />
+
+            <label style={{ fontSize: 11, color: "#334155" }}>
+              API URL (可选，优先级高于 Base URL)
+            </label>
+            <input
+              type="text"
+              value={settings.apiUrl}
+              onChange={(event) =>
+                setSettings((prev) => ({ ...prev, apiUrl: event.target.value }))
+              }
+              placeholder="https://xxx/v1/chat/completions"
+              style={{
+                borderRadius: 10,
+                border: "1px solid rgba(148, 163, 184, 0.4)",
+                backgroundColor: "#fff",
+                padding: "9px 10px",
+                fontSize: 12
+              }}
+            />
+
+            <label style={{ fontSize: 11, color: "#334155" }}>模型名</label>
+            <input
+              type="text"
+              value={settings.model}
+              onChange={(event) =>
+                setSettings((prev) => ({ ...prev, model: event.target.value }))
+              }
+              placeholder="moonshot-v1-8k"
+              style={{
+                borderRadius: 10,
+                border: "1px solid rgba(148, 163, 184, 0.4)",
+                backgroundColor: "#fff",
+                padding: "9px 10px",
+                fontSize: 12
+              }}
+            />
+          </div>
+
+          <div
+            style={{
+              marginTop: 10,
+              borderRadius: 10,
+              padding: 9,
+              fontSize: 11,
+              lineHeight: 1.5,
+              color: "#334155",
+              border: "1px dashed rgba(51, 65, 85, 0.25)",
+              backgroundColor: "rgba(248, 250, 252, 0.8)"
+            }}>
+            当前请求地址: {endpointLabel}
+            <br />
+            域名授权状态: {getPermissionStatusText(permissionStatus)}
+          </div>
+
+          <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+            <button
+              onClick={handleSaveSettings}
+              disabled={saving}
+              style={getPrimaryButtonStyle(saving)}>
+              {saving ? "正在保存..." : "保存配置"}
+            </button>
+
+            <button
+              onClick={handleTestConnection}
+              disabled={testing}
+              style={getSecondaryButtonStyle(testing)}>
+              {testing ? "测试中..." : "测试连接"}
+            </button>
+
+            {permissionStatus !== "granted" && (
+              <button
+                onClick={handleGrantPermission}
+                style={getSecondaryButtonStyle(false)}>
+                授权当前接口域名
+              </button>
+            )}
+
+            <button
+              onClick={handleClearSettings}
+              style={{
+                ...getSecondaryButtonStyle(false),
+                borderColor: "rgba(244, 63, 94, 0.35)",
+                color: "#881337"
+              }}>
+              清空本地配置
+            </button>
+          </div>
+
+          <div
+            style={{
+              marginTop: 10,
+              fontSize: 11,
+              lineHeight: 1.5,
+              color: "#475569"
+            }}>
+            说明: 仅在你点击“生成/测试”时向配置的接口发请求，不会把 Diff 上传到开发者自建服务器。
+          </div>
+        </div>
+      )}
     </div>
   )
 }

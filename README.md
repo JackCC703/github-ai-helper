@@ -85,27 +85,7 @@
 npm install
 ```
 
-### 2. 配置环境变量
-
-复制示例配置：
-
-```bash
-cp .env.example .env
-```
-
-然后按你的模型服务填写配置。
-
-如果你继续使用 Kimi，只填 API Key 也可以，默认值已经指向 Moonshot：
-
-```bash
-PLASMO_PUBLIC_AI_API_KEY=your_api_key_here
-PLASMO_PUBLIC_AI_BASE_URL=https://api.moonshot.cn/v1
-PLASMO_PUBLIC_AI_MODEL=moonshot-v1-8k
-```
-
-如果你接其他兼容 OpenAI Chat Completions 的服务，改成对应的 `Base URL` 和 `Model` 即可。
-
-### 3. 启动开发构建
+### 2. 启动开发构建
 
 ```bash
 npm run dev
@@ -117,12 +97,22 @@ npm run dev
 build/chrome-mv3-dev
 ```
 
-### 4. 在浏览器中加载扩展
+### 3. 在浏览器中加载扩展
 
 1. 打开 `chrome://extensions`
 2. 开启“开发者模式”
 3. 点击“加载已解压的扩展程序”
 4. 选择 `build/chrome-mv3-dev`
+
+### 4. 在插件里配置你的 AI 接口
+
+首次打开扩展后，切换到“`设置`”页，填写并保存：
+
+- `API Key`
+- `Base URL`（或直接填 `API URL`）
+- `Model`
+
+保存时扩展会按你填写的接口域名申请权限。配置仅保存在当前浏览器本地存储中（`chrome.storage.local`）。
 
 ## 日常使用
 
@@ -130,8 +120,9 @@ build/chrome-mv3-dev
 
 1. 打开 GitHub PR 或 Compare 页面
 2. 点击扩展图标
-3. 点击“`一键生成 PR 描述`”
-4. 等待 AI 返回结果
+3. 确保在“`设置`”页已完成 API 配置
+4. 回到“`生成`”页点击“`一键生成 PR 描述`”
+5. 等待 AI 返回结果
 
 ### 回填到 GitHub
 
@@ -145,32 +136,35 @@ build/chrome-mv3-dev
 - GitHub 编辑器还没有展开
 - GitHub 页面 DOM 结构发生了变化
 
-## 环境变量
+## 插件内配置项
 
-| 变量名 | 说明 |
+| 配置项 | 说明 |
 | --- | --- |
-| `PLASMO_PUBLIC_AI_API_KEY` | 通用 AI API Key |
-| `PLASMO_PUBLIC_AI_BASE_URL` | AI 服务基础地址，默认是 `https://api.moonshot.cn/v1` |
-| `PLASMO_PUBLIC_AI_MODEL` | 调用的模型名，默认是 `moonshot-v1-8k` |
-| `PLASMO_PUBLIC_AI_API_URL` | 可选。直接指定完整接口地址；设置后会覆盖 `PLASMO_PUBLIC_AI_BASE_URL` |
-| `PLASMO_PUBLIC_KIMI_API_KEY` | 兼容旧配置的备用变量，未设置 `PLASMO_PUBLIC_AI_API_KEY` 时会回退使用 |
+| `API Key` | 你的模型服务密钥 |
+| `Base URL` | 模型服务基础地址，默认建议 `https://api.moonshot.cn/v1` |
+| `API URL` | 可选。直接指定完整 `chat/completions` 地址，优先级高于 Base URL |
+| `Model` | 调用模型名，例如 `moonshot-v1-8k` |
 
 ## 权限说明
 
 项目当前声明了以下扩展权限：
 
 - `tabs`：读取当前活动标签页 URL
-- `storage`：预留浏览器本地存储能力
+- `storage`：保存用户本地配置（API Key / URL / Model）
 - `scripting`：向 GitHub 页面注入脚本，用于自动粘贴结果
+- `permissions`：运行时按接口域名申请权限
 
-站点权限：
+默认站点权限：
 
 - `https://github.com/*`
 - `https://patch-diff.githubusercontent.com/*`
+
+可选站点权限（仅在用户保存配置时按目标接口域名申请）：
+
 - `https://*/*`
 - `http://*/*`
 
-这些权限分别用于识别当前 GitHub 页面、抓取 Diff、回填 PR 描述，以及请求你配置的外部 AI 接口。
+这些权限分别用于识别 GitHub 页面、抓取 Diff、回填 PR 描述，以及在你授权后请求你自己配置的 AI 接口。
 
 ## 项目结构
 
@@ -178,7 +172,8 @@ build/chrome-mv3-dev
 .
 ├── assets/               # 图标等静态资源
 ├── .github/workflows/    # GitHub Actions
-├── popup.tsx             # 扩展弹窗和主要业务逻辑
+├── lib/                  # AI 请求与配置存储逻辑
+├── popup.tsx             # 扩展弹窗（生成 + 设置）
 ├── package.json          # 依赖、脚本、扩展权限
 └── README.md
 ```
@@ -190,7 +185,7 @@ build/chrome-mv3-dev
 - 逻辑主要集中在单文件里，后续可以继续拆分模块
 - prompt 已升级为统一 PR 模版，但还没有自定义模板配置能力
 - Diff 做了长度截断，超大改动场景下摘要质量可能下降
-- 直接在前端使用 `PLASMO_PUBLIC_` 环境变量，不适合高安全要求场景
+- API Key 改为用户本地配置，但仍属于前端持有密钥方案，不适合高安全要求场景
 
 如果后续准备把它做成更长期维护的项目，更推荐把 AI 请求迁移到后端服务中处理，同时补充更细粒度的配置和测试。
 
