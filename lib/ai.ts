@@ -75,7 +75,7 @@ export const fetchDiff = async (url: string): Promise<DiffResult> => {
   if (!diffUrl) {
     return {
       ok: false,
-      message: "请在 GitHub Pull Request 或 Compare 页面使用我"
+      message: "请在 GitHub Pull Request 或 Compare 页面使用"
     }
   }
 
