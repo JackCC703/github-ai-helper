@@ -269,14 +269,14 @@ function IndexPopup() {
     try {
       const diff = await fetchDiff(tab.url)
 
-      if (!diff.ok) {
+      if (diff.ok === false) {
         setNotice({ level: "error", text: diff.message })
         return
       }
 
       const aiResult = await askAi(diff.content, settings)
 
-      if (!aiResult.ok) {
+      if (aiResult.ok === false) {
         setNotice({ level: "error", text: aiResult.message })
         return
       }
@@ -308,9 +308,9 @@ function IndexPopup() {
           const isVisibleInPage = (element: HTMLElement | null) =>
             Boolean(
               element &&
-                (element.offsetWidth ||
-                  element.offsetHeight ||
-                  element.getClientRects().length)
+              (element.offsetWidth ||
+                element.offsetHeight ||
+                element.getClientRects().length)
             )
 
           const textareaSelectors = [
@@ -438,7 +438,7 @@ function IndexPopup() {
     try {
       const connectionResult = await testAiConnection(sanitized)
 
-      if (!connectionResult.ok) {
+      if (connectionResult.ok === false) {
         setNotice({ level: "error", text: connectionResult.message })
         return
       }
@@ -686,8 +686,7 @@ function IndexPopup() {
               border: "1px dashed rgba(51, 65, 85, 0.24)"
             }}>
             发送目标: {getApiTargetLabel(settings)} | 域名权限:
-            {` ${getPermissionStatusText(permissionStatus)} | `}
-            Key: {maskApiKey(settings.apiKey)}
+            {`${getPermissionStatusText(permissionStatus)}`}
           </div>
         </div>
       ) : (
