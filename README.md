@@ -42,6 +42,12 @@
 
 ## 使用效果
 
+插件弹窗目前覆盖“生成结果预览”和“接口配置”两个核心场景，界面如下：
+
+![AI PR Helper 插件截图 1](<./ai helper 插件截图1.png>)
+
+![AI PR Helper 插件截图 2](<./ai helper 插件截图2.png>)
+
 典型使用方式如下：
 
 1. 在 GitHub 打开一个 Pull Request 页面，或者 Compare 页面
