@@ -44,9 +44,10 @@
 
 插件弹窗目前覆盖“生成结果预览”和“接口配置”两个核心场景，界面如下：
 
-![AI PR Helper 插件截图 1](<./ai helper 插件截图1.png>)
-
-![AI PR Helper 插件截图 2](<./ai helper 插件截图2.png>)
+<p align="center">
+  <img src="./ai%20helper%20插件截图1.png" alt="AI PR Helper 插件截图 1" width="46%" />
+  <img src="./ai%20helper%20插件截图2.png" alt="AI PR Helper 插件截图 2" width="46%" />
+</p>
 
 典型使用方式如下：
 
